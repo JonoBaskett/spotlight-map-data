@@ -1,667 +1,416 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spotlight Ranked Firms Interactive Map</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
-    <style>
-        body {
-            margin: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-        }
-        
-        .container {
-            display: flex;
-            height: 100vh;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-        }
-        
-        .map-container {
-            flex: 1;
-            position: relative;
-            background: #f8f9fa;
-        }
-        
-        .sidebar {
-            width: 400px;
-            background: white;
-            border-left: 3px solid #667eea;
-            padding: 20px;
-            overflow-y: auto;
-            box-shadow: -5px 0 15px rgba(0,0,0,0.1);
-        }
-        
-        .header {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            padding: 20px;
-            text-align: center;
-            margin: -20px -20px 20px -20px;
-        }
-        
-        .header h1 {
-            margin: 0;
-            font-size: 1.5em;
-            font-weight: 300;
-        }
-        
-        .controls {
-            margin-bottom: 25px;
-        }
-        
-        .control-group {
-            margin-bottom: 15px;
-        }
-        
-        .control-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-            color: #333;
-        }
-        
-        select, button {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e1e5e9;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: all 0.3s ease;
-        }
-        
-        select:focus, button:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-        
-        button {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
-        
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
-        }
-        
-        .firms-table {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 15px;
-            max-height: 500px;
-            overflow-y: auto;
-        }
-        
-        .firms-table h3 {
-            margin-top: 0;
-            color: #333;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 10px;
-        }
-        
-        .firm-item {
-            background: white;
-            padding: 12px;
-            margin-bottom: 8px;
-            border-radius: 6px;
-            border-left: 4px solid #667eea;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .firm-name {
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 4px;
-            font-size: 0.95em;
-        }
-        
-        .firm-city {
-            color: #666;
-            font-size: 0.85em;
-            margin-bottom: 4px;
-        }
-        
-        .firm-practice-areas {
-            color: #888;
-            font-size: 0.8em;
-            font-style: italic;
-        }
-        
-        svg {
-            width: 100%;
-            height: 100%;
-        }
-        
-        .state {
-            fill: #e8e8e8;
-            stroke: #fff;
-            stroke-width: 1px;
-            transition: all 0.3s ease;
-            cursor: default;
-        }
-        
-        .state:hover {
-            stroke-width: 2px;
-            stroke: #667eea;
-        }
-        
-        .state.has-firms {
-            cursor: pointer;
-        }
-        
-        .state.has-firms:hover {
-            filter: brightness(1.1);
-        }
-        
-        .city-circle {
-            fill: #ff6b35;
-            stroke: #fff;
-            stroke-width: 1.5px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .city-circle:hover {
-            fill: #ff8c42;
-            stroke-width: 2.5px;
-        }
-
-        .city-tooltip {
-            position: absolute;
-            background: rgba(0, 0, 0, 0.85);
-            color: white;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 14px;
-            pointer-events: none;
-            z-index: 1000;
-            display: none;
-            white-space: nowrap;
-        }
-        
-        .legend {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
-        
-        .legend-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-        
-        .legend-color {
-            width: 20px;
-            height: 20px;
-            margin-right: 10px;
-            border-radius: 3px;
-        }
-        
-        .back-button {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            z-index: 1000;
-            display: none;
-            padding: 10px 20px;
-            background: rgba(255, 255, 255, 0.95);
-            border: 2px solid #667eea;
-            border-radius: 8px;
-            color: #667eea;
-            font-weight: 600;
-            cursor: pointer;
-            width: auto;
-        }
-        
-        .back-button:hover {
-            background: #667eea;
-            color: white;
-        }
-        
-        .state-title {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-size: 1.2em;
-            font-weight: 600;
-            color: #333;
-            display: none;
-        }
-        
-        .stats {
-            background: #e8f2ff;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 4px solid #667eea;
-        }
-        
-        .stats h4 {
-            margin: 0 0 10px 0;
-            color: #333;
-        }
-        
-        .stats p {
-            margin: 5px 0;
-            color: #666;
-            font-size: 0.9em;
-        }
-
-        .loading {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 1.2em;
-            color: #667eea;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spotlight Ranked Firms Interactive Map</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+  <style>
+    body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+    .container { display: flex; height: 100vh; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+    .map-container { flex: 1; position: relative; background: #f8f9fa; }
+    .sidebar { width: 400px; background: white; border-left: 3px solid #667eea; padding: 20px; overflow-y: auto; box-shadow: -5px 0 15px rgba(0,0,0,0.1); }
+    .header { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 20px; text-align: center; margin: -20px -20px 20px -20px; }
+    .header h1 { margin: 0; font-size: 1.5em; font-weight: 300; }
+    .controls { margin-bottom: 25px; }
+    .control-group { margin-bottom: 15px; }
+    .control-group label { display: block; margin-bottom: 5px; font-weight: 600; color: #333; }
+    select, button, input[type="text"] { width: 100%; padding: 12px; border: 2px solid #e1e5e9; border-radius: 8px; font-size: 14px; transition: all 0.3s ease; }
+    select:focus, button:focus, input[type="text"]:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
+    button { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; cursor: pointer; font-weight: 600; margin-bottom: 10px; }
+    button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3); }
+    .firms-table { background: #f8f9fa; border-radius: 10px; padding: 15px; max-height: 500px; overflow-y: auto; }
+    .firms-table h3 { margin-top: 0; color: #333; border-bottom: 2px solid #667eea; padding-bottom: 10px; }
+    .firm-item { background: white; padding: 12px; margin-bottom: 8px; border-radius: 6px; border-left: 4px solid #667eea; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .firm-name { font-weight: 600; color: #333; margin-bottom: 4px; font-size: 0.95em; }
+    .firm-city { color: #666; font-size: 0.85em; margin-bottom: 4px; }
+    .firm-practice-areas { color: #888; font-size: 0.8em; font-style: italic; }
+    svg { width: 100%; height: 100%; }
+    .state { fill: #e8e8e8; stroke: #fff; stroke-width: 1px; transition: all 0.3s ease; cursor: default; }
+    .state:hover { stroke-width: 2px; stroke: #667eea; }
+    .state.has-firms { cursor: pointer; }
+    .state.has-firms:hover { filter: brightness(1.1); }
+    .city-circle { fill: #ff6b35; stroke: #fff; stroke-width: 1.5px; cursor: pointer; transition: all 0.3s ease; }
+    .city-circle:hover { fill: #ff8c42; stroke-width: 2.5px; }
+    .city-tooltip { position: absolute; background: rgba(0, 0, 0, 0.85); color: white; padding: 8px 12px; border-radius: 6px; font-size: 14px; pointer-events: none; z-index: 1000; display: none; white-space: nowrap; }
+    .legend { position: absolute; bottom: 20px; left: 20px; background: rgba(255, 255, 255, 0.95); padding: 15px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+    .legend-item { display: flex; align-items: center; margin-bottom: 8px; }
+    .legend-color { width: 20px; height: 20px; margin-right: 10px; border-radius: 3px; }
+    .back-button { position: absolute; top: 20px; left: 20px; z-index: 1000; display: none; padding: 10px 20px; background: rgba(255, 255, 255, 0.95); border: 2px solid #667eea; border-radius: 8px; color: #667eea; font-weight: 600; cursor: pointer; width: auto; }
+    .back-button:hover { background: #667eea; color: white; }
+    .state-title { position: absolute; top: 20px; right: 20px; background: rgba(255, 255, 255, 0.95); padding: 10px 20px; border-radius: 8px; font-size: 1.2em; font-weight: 600; color: #333; display: none; }
+    .stats { background: #e8f2ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #667eea; }
+    .stats h4 { margin: 0 0 10px 0; color: #333; }
+    .stats p { margin: 5px 0; color: #666; font-size: 0.9em; }
+    .loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.2em; color: #667eea; }
+  </style>
 </head>
 <body>
-    <div class="loading" id="loading">Loading firm data...</div>
-    <div class="city-tooltip" id="cityTooltip"></div>
-    <div class="container" style="display: none;" id="mainContainer">
-        <div class="map-container">
-            <button class="back-button" onclick="resetToUSView()">← Back to US Map</button>
-            <div class="state-title" id="stateTitle"></div>
-            <svg id="map"></svg>
-            <div class="legend">
-                <div class="legend-item">
-                    <div class="legend-color" style="background: #002b49;"></div>
-                    <span>High (200+ firms)</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: #4a7a9e;"></div>
-                    <span>Medium (100-199 firms)</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: #8ba8c4;"></div>
-                    <span>Low (50-99 firms)</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: #CBE1F8;"></div>
-                    <span>Few (1-49 firms)</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: #ff6b35;"></div>
-                    <span>Cities</span>
-                </div>
-            </div>
-        </div>
-        
-        <div class="sidebar">
-            <div class="header">
-                <h1>Spotlight Ranked Firms</h1>
-            </div>
-            
-            <div class="stats" id="statsPanel">
-                <h4>Map Statistics</h4>
-                <p><strong>Total States:</strong> 10</p>
-                <p><strong>Total Firms:</strong> 1,154</p>
-                <p><strong>Practice Areas:</strong> 65+</p>
-            </div>
-            
-            <div class="controls">
-                <div class="control-group">
-                    <label for="firmSearch">Search for Firm:</label>
-                    <input type="text" id="firmSearch" placeholder="Type firm name..." oninput="searchFirms()">
-                </div>
-                <div class="control-group">
-                    <label for="practiceArea">Filter by Practice Area:</label>
-                    <select id="practiceArea" onchange="filterByPracticeArea()">
-                        <option value="all">All Practice Areas</option>
-                    </select>
-                </div>
-                <button onclick="resetToUSView()">Reset View</button>
-            </div>
-            
-            <div class="firms-table" id="firmsTable">
-                <h3>Select a state to view ranked firms</h3>
-                <p>Click on any highlighted state to zoom in and explore the ranked firms in that area.</p>
-            </div>
-        </div>
+  <div class="loading" id="loading">Loading firm data...</div>
+  <div class="city-tooltip" id="cityTooltip"></div>
+  <div class="container" style="display: none;" id="mainContainer">
+    <div class="map-container">
+      <button class="back-button" onclick="resetToUSView()">← Back to US Map</button>
+      <div class="state-title" id="stateTitle"></div>
+      <svg id="map"></svg>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-color" style="background: #002b49;"></div><span>High (200+ firms)</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #4a7a9e;"></div><span>Medium (100-199 firms)</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #8ba8c4;"></div><span>Low (50-99 firms)</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #CBE1F8;"></div><span>Few (1-49 firms)</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #ff6b35;"></div><span>Cities</span></div>
+      </div>
     </div>
 
-    <script>
-        let currentState = null;
-        let currentFilter = 'all';
-        let firmsData = {};
-        let allPracticeAreas = new Set();
-        let svg, projection, path, zoom;
+    <div class="sidebar">
+      <div class="header">
+        <h1>Spotlight Ranked Firms</h1>
+      </div>
 
-        // Load and process CSV data from GitHub
-        fetch('https://raw.githubusercontent.com/JonoBaskett/spotlight-map-data/refs/heads/main/spotlight-firms-data.csv')
-            .then(response => {
-                if (!response.ok) throw new Error('Failed to load CSV');
-                return response.text();
+      <div class="stats" id="statsPanel">
+        <h4>Map Statistics</h4>
+        <p><strong>Total States:</strong> <span id="statStates">—</span></p>
+        <p><strong>Total Firms:</strong> <span id="statFirms">—</span></p>
+        <p><strong>Practice Areas:</strong> <span id="statPAs">—</span></p>
+      </div>
+
+      <div class="controls">
+        <div class="control-group">
+          <label for="firmSearch">Search for Firm:</label>
+          <input type="text" id="firmSearch" placeholder="Type firm name..." oninput="searchFirms()">
+        </div>
+        <div class="control-group">
+          <label for="practiceArea">Filter by Practice Area:</label>
+          <select id="practiceArea" onchange="filterByPracticeArea()">
+            <option value="all">All Practice Areas</option>
+          </select>
+        </div>
+        <button onclick="resetToUSView()">Reset View</button>
+      </div>
+
+      <div class="firms-table" id="firmsTable">
+        <h3>Select a state to view ranked firms</h3>
+        <p>Click on any highlighted state to zoom in and explore the ranked firms in that area.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentState = null;
+    let currentFilter = 'all';
+    // NOTE: With data.json, the shape is:
+    // firmsData = { [state]: { cities: { [city]: { coords:[lon,lat], firms:[{name, practiceAreas:[]}] }}}}
+    let firmsData = {};
+    let allPracticeAreas = new Set();
+    let svg, projection, path, zoom;
+
+    // 1) Load JSON built by GitHub Actions (data.json at repo root)
+    async function loadData() {
+      const url = './data.json?v=' + Date.now(); // cache-bust
+      const resp = await fetch(url, { cache: 'no-store' });
+      if (!resp.ok) throw new Error('Failed to load data.json: ' + resp.status);
+      return resp.json();
+    }
+
+    // 2) Init after data is ready
+    loadData()
+      .then(json => {
+        firmsData = json;
+        collectPracticeAreas();
+        initializeMap();
+        updateStatsPanel();
+
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('mainContainer').style.display = 'flex';
+      })
+      .catch(err => {
+        console.error(err);
+        document.getElementById('loading').textContent =
+          'Error loading firm data. Please check data.json and refresh the page.';
+      });
+
+    // Build the Practice Area dropdown from JSON
+    function collectPracticeAreas() {
+      allPracticeAreas = new Set();
+      Object.values(firmsData).forEach(stateObj => {
+        Object.values(stateObj.cities).forEach(cityObj => {
+          (cityObj.firms || []).forEach(f => (f.practiceAreas || []).forEach(pa => allPracticeAreas.add(pa)));
+        });
+      });
+      const select = document.getElementById('practiceArea');
+      Array.from(allPracticeAreas).sort().forEach(area => {
+        const option = document.createElement('option');
+        option.value = area;
+        option.textContent = area;
+        select.appendChild(option);
+      });
+    }
+
+    // Utility: total unique firms in a state
+    function getUniqueFirmCount(stateName) {
+      const st = firmsData[stateName];
+      if (!st) return 0;
+      const set = new Set();
+      Object.values(st.cities).forEach(cityObj => {
+        (cityObj.firms || []).forEach(f => set.add(f.name));
+      });
+      return set.size;
+    }
+
+    // Color scale for states by firm count
+    function getStateColor(stateName) {
+      const count = getUniqueFirmCount(stateName);
+      if (count === 0) return '#e8e8e8';
+      const maxCount = 262; // calibrate as needed
+      const minCount = 1;
+      const ratio = (count - minCount) / (maxCount - minCount);
+      const r = Math.round(203 - (203 * ratio));
+      const g = Math.round(225 - (182 * ratio));
+      const b = Math.round(248 - (175 * ratio));
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    function initializeMap() {
+      svg = d3.select("#map");
+      const width = 960, height = 600;
+
+      projection = d3.geoAlbersUsa().scale(1300).translate([width / 2, height / 2]);
+      path = d3.geoPath().projection(projection);
+      zoom = d3.zoom().scaleExtent([1, 8]).on("zoom", (event) => {
+        svg.selectAll("path").attr("transform", event.transform);
+        svg.selectAll("circle").attr("transform", event.transform);
+        addCityCircles(); // keep circle size sensible while zooming
+      });
+      svg.call(zoom);
+
+      d3.json("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json").then(us => {
+        const states = topojson.feature(us, us.objects.states);
+
+        svg.selectAll(".state")
+          .data(states.features)
+          .enter().append("path")
+          .attr("class", d => "state" + (getUniqueFirmCount(getStateName(d.id)) > 0 ? " has-firms" : ""))
+          .attr("d", path)
+          .attr("fill", d => getStateColor(getStateName(d.id)))
+          .on("click", (event, d) => {
+            const stateName = getStateName(d.id);
+            if (getUniqueFirmCount(stateName) > 0) zoomToState(d, stateName);
+          });
+
+        addCityCircles();
+        showStatesList();
+      });
+    }
+
+    function addCityCircles() {
+      svg.selectAll(".city-circle").remove();
+      const tooltip = document.getElementById('cityTooltip');
+      const currentTransform = d3.zoomTransform(svg.node());
+      const scale = currentTransform.k;
+
+      Object.entries(firmsData).forEach(([stateName, stateObj]) => {
+        Object.entries(stateObj.cities).forEach(([cityName, cityObj]) => {
+          const firms = cityObj.firms || [];
+          if (!firms.length) return;
+
+          const filtered = currentFilter === 'all'
+            ? firms
+            : firms.filter(f => f.practiceAreas && f.practiceAreas.includes(currentFilter));
+          if (!filtered.length) return;
+
+          const [lon, lat] = cityObj.coords || [];
+          const proj = lon != null && lat != null ? projection([lon, lat]) : null;
+          if (!proj) return;
+
+          const baseRadius = 5;
+          const adjustedRadius = baseRadius / Math.sqrt(scale);
+
+          svg.append("circle")
+            .attr("class", "city-circle")
+            .attr("cx", proj[0])
+            .attr("cy", proj[1])
+            .attr("r", adjustedRadius)
+            .on("click", (event) => {
+              event.stopPropagation();
+              showCityFirms(stateName, cityName);
             })
-            .then(csvText => {
-                const data = d3.csvParse(csvText);
-                processData(data);
-                initializeMap();
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('mainContainer').style.display = 'flex';
+            .on("mouseover", function(event) {
+              const n = filtered.length;
+              tooltip.textContent = `${cityName} (${n} firm${n !== 1 ? 's' : ''})`;
+              tooltip.style.display = 'block';
+              d3.select(this).attr("r", adjustedRadius * 1.3);
             })
-            .catch(error => {
-                console.error('Error loading data:', error);
-                document.getElementById('loading').textContent = 'Error loading firm data. Please check your internet connection and refresh the page.';
+            .on("mousemove", function(event) {
+              tooltip.style.left = (event.pageX + 15) + 'px';
+              tooltip.style.top = (event.pageY - 10) + 'px';
+            })
+            .on("mouseout", function() {
+              tooltip.style.display = 'none';
+              d3.select(this).attr("r", adjustedRadius);
             });
+        });
+      });
+    }
 
-        function processData(data) {
-            data.forEach(row => {
-                const state = row.State;
-                const city = row.City;
-                const practiceArea = row['Practice Area'];
-                const firmName = row['Firm Name'];
-                const lat = parseFloat(row.Latitude);
-                const lng = parseFloat(row.Longitude);
+    function zoomToState(stateFeature, stateName) {
+      currentState = stateName;
+      document.querySelector('.back-button').style.display = 'block';
+      document.querySelector('#stateTitle').style.display = 'block';
+      document.querySelector('#stateTitle').textContent = stateName;
 
-                if (!state || !city || !firmName) return;
+      const bounds = path.bounds(stateFeature);
+      const dx = bounds[1][0] - bounds[0][0];
+      const dy = bounds[1][1] - bounds[0][1];
+      const x = (bounds[0][0] + bounds[1][0]) / 2;
+      const y = (bounds[0][1] + bounds[1][1]) / 2;
+      const scale = Math.min(8, 0.9 / Math.max(dx / 960, dy / 600));
+      const translate = [960 / 2 - scale * x, 600 / 2 - scale * y];
 
-                allPracticeAreas.add(practiceArea);
+      svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale));
+      showStateFirms(stateName);
+    }
 
-                if (!firmsData[state]) {
-                    firmsData[state] = { cities: {} };
-                }
+    function resetToUSView() {
+      currentState = null;
+      document.querySelector('.back-button').style.display = 'none';
+      document.querySelector('#stateTitle').style.display = 'none';
+      svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity);
+      showStatesList();
+    }
 
-                if (!firmsData[state].cities[city]) {
-                    firmsData[state].cities[city] = [];
-                }
+    function showStatesList() {
+      const stateCounts = {};
+      Object.keys(firmsData).forEach(state => { stateCounts[state] = getUniqueFirmCount(state); });
 
-                const existingFirm = firmsData[state].cities[city].find(f => f.name === firmName);
-                if (existingFirm) {
-                    if (!existingFirm.practiceAreas.includes(practiceArea)) {
-                        existingFirm.practiceAreas.push(practiceArea);
-                    }
-                } else {
-                    firmsData[state].cities[city].push({
-                        name: firmName,
-                        practiceAreas: [practiceArea],
-                        latitude: lat,
-                        longitude: lng
-                    });
-                }
-            });
+      const sortedStates = Object.entries(stateCounts).sort((a, b) => b[1] - a[1]);
 
-            // Populate practice area dropdown
-            const select = document.getElementById('practiceArea');
-            Array.from(allPracticeAreas).sort().forEach(area => {
-                const option = document.createElement('option');
-                option.value = area;
-                option.textContent = area;
-                select.appendChild(option);
-            });
-        }
+      let html = '<h3>Spotlight Ranked Firms by State</h3>';
+      html += '<p style="margin-bottom: 15px;">Click on any state to explore firms and filter by practice area.</p>';
+      html += '<div style="background: white; border-radius: 6px; padding: 10px;">';
+      html += '<ul style="margin: 0; padding-left: 20px;">';
+      sortedStates.forEach(([state, count]) => { html += `<li style="margin: 8px 0;"><strong>${state}:</strong> ${count} firms</li>`; });
+      html += '</ul></div>';
 
-        function getUniqueFirmCount(stateName) {
-            if (!firmsData[stateName]) return 0;
-            const uniqueFirms = new Set();
-            Object.values(firmsData[stateName].cities).forEach(cityFirms => {
-                cityFirms.forEach(firm => uniqueFirms.add(firm.name));
-            });
-            return uniqueFirms.size;
-        }
+      document.getElementById('firmsTable').innerHTML = html;
+    }
 
-        function getStateColor(stateName) {
-            const count = getUniqueFirmCount(stateName);
-            if (count === 0) return '#e8e8e8';
-            
-            // Calculate color between dark blue (#002b49) and light blue (#CBE1F8)
-            const maxCount = 262; // NY has the most firms
-            const minCount = 1;
-            const ratio = (count - minCount) / (maxCount - minCount);
-            
-            // Dark blue RGB: 0, 43, 73
-            // Light blue RGB: 203, 225, 248
-            const r = Math.round(203 - (203 * ratio));
-            const g = Math.round(225 - (182 * ratio));
-            const b = Math.round(248 - (175 * ratio));
-            
-            return `rgb(${r}, ${g}, ${b})`;
-        }
+    function showStateFirms(stateName) {
+      const firms = [];
+      const st = firmsData[stateName];
+      if (!st) return;
 
-        function initializeMap() {
-            svg = d3.select("#map");
-            const width = 960;
-            const height = 600;
+      Object.entries(st.cities).forEach(([city, cityObj]) => {
+        (cityObj.firms || []).forEach(firm => {
+          const matches = currentFilter === 'all' || (firm.practiceAreas || []).includes(currentFilter);
+          if (matches) firms.push({ ...firm, city });
+        });
+      });
 
-            projection = d3.geoAlbersUsa()
-                .scale(1300)
-                .translate([width / 2, height / 2]);
+      firms.sort((a, b) => a.name.localeCompare(b.name));
 
-            path = d3.geoPath().projection(projection);
+      let html = `<h3>Firms in ${stateName}</h3>`;
+      html += `<p style="margin-bottom: 15px;"><strong>${firms.length}</strong> firm${firms.length !== 1 ? 's' : ''} found</p>`;
+      firms.forEach(firm => {
+        html += `
+          <div class="firm-item">
+            <div class="firm-name">${firm.name}</div>
+            <div class="firm-city">${firm.city}</div>
+            <div class="firm-practice-areas">${(firm.practiceAreas || []).join(', ')}</div>
+          </div>`;
+      });
+      document.getElementById('firmsTable').innerHTML = html;
+    }
 
-            zoom = d3.zoom()
-                .scaleExtent([1, 8])
-                .on("zoom", (event) => {
-                    svg.selectAll("path").attr("transform", event.transform);
-                    svg.selectAll("circle").attr("transform", event.transform);
-                    // Redraw circles with adjusted size when zooming
-                    addCityCircles();
-                });
+    function showCityFirms(stateName, cityName) {
+      const cityObj = firmsData[stateName]?.cities?.[cityName];
+      if (!cityObj) return;
+      const firms = (cityObj.firms || [])
+        .filter(f => currentFilter === 'all' || (f.practiceAreas || []).includes(currentFilter))
+        .sort((a, b) => a.name.localeCompare(b.name));
 
-            svg.call(zoom);
+      let html = `<h3>Firms in ${cityName}, ${stateName}</h3>`;
+      html += `<p style="margin-bottom: 15px;"><strong>${firms.length}</strong> firm${firms.length !== 1 ? 's' : ''}</p>`;
+      firms.forEach(firm => {
+        html += `
+          <div class="firm-item">
+            <div class="firm-name">${firm.name}</div>
+            <div class="firm-practice-areas">${(firm.practiceAreas || []).join(', ')}</div>
+          </div>`;
+      });
+      document.getElementById('firmsTable').innerHTML = html;
+    }
 
-            d3.json("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json").then(us => {
-                const states = topojson.feature(us, us.objects.states);
+    function filterByPracticeArea() {
+      currentFilter = document.getElementById('practiceArea').value;
+      addCityCircles();
+      if (currentState) showStateFirms(currentState);
+    }
 
-                svg.selectAll(".state")
-                    .data(states.features)
-                    .enter().append("path")
-                    .attr("class", "state")
-                    .attr("d", path)
-                    .attr("fill", d => getStateColor(getStateName(d.id)))
-                    .classed("has-firms", d => getUniqueFirmCount(getStateName(d.id)) > 0)
-                    .on("click", (event, d) => {
-                        const stateName = getStateName(d.id);
-                        if (getUniqueFirmCount(stateName) > 0) {
-                            zoomToState(d, stateName);
-                        }
-                    });
+    // State FIPS → Name map
+    function getStateName(stateId) {
+      const stateNames = {
+        "01": "Alabama","02": "Alaska","04": "Arizona","05": "Arkansas","06": "California","08": "Colorado","09": "Connecticut",
+        "10": "Delaware","11": "District of Columbia","12": "Florida","13": "Georgia","15": "Hawaii","16": "Idaho","17": "Illinois",
+        "18": "Indiana","19": "Iowa","20": "Kansas","21": "Kentucky","22": "Louisiana","23": "Maine","24": "Maryland","25": "Massachusetts",
+        "26": "Michigan","27": "Minnesota","28": "Mississippi","29": "Missouri","30": "Montana","31": "Nebraska","32": "Nevada",
+        "33": "New Hampshire","34": "New Jersey","35": "New Mexico","36": "New York","37": "North Carolina","38": "North Dakota","39": "Ohio",
+        "40": "Oklahoma","41": "Oregon","42": "Pennsylvania","44": "Rhode Island","45": "South Carolina","46": "South Dakota","47": "Tennessee",
+        "48": "Texas","49": "Utah","50": "Vermont","51": "Virginia","53": "Washington","54": "West Virginia","55": "Wisconsin","56": "Wyoming"
+      };
+      return stateNames[String(stateId).padStart(2, '0')];
+    }
 
-                addCityCircles();
-                showStatesList();
-            });
-        }
+    // Stats panel numbers from JSON
+    function updateStatsPanel() {
+      const states = Object.keys(firmsData).length;
+      const paSet = new Set();
+      const firmSet = new Set();
+      Object.values(firmsData).forEach(st => {
+        Object.values(st.cities).forEach(city => {
+          (city.firms || []).forEach(f => {
+            firmSet.add(f.name);
+            (f.practiceAreas || []).forEach(pa => paSet.add(pa));
+          });
+        });
+      });
+      document.getElementById('statStates').textContent = states.toString();
+      document.getElementById('statFirms').textContent = firmSet.size.toLocaleString();
+      document.getElementById('statPAs').textContent = paSet.size.toString();
+    }
 
-        function addCityCircles() {
-            svg.selectAll(".city-circle").remove();
+    // (Optional) simple firm name search within current state list
+    function searchFirms() {
+      const q = document.getElementById('firmSearch').value.trim().toLowerCase();
+      if (!q) {
+        if (currentState) showStateFirms(currentState); else showStatesList();
+        return;
+      }
+      const results = [];
+      const scanStates = currentState ? { [currentState]: firmsData[currentState] } : firmsData;
+      Object.entries(scanStates).forEach(([stateName, st]) => {
+        Object.entries(st.cities).forEach(([cityName, cityObj]) => {
+          (cityObj.firms || []).forEach(f => {
+            const matches = f.name.toLowerCase().includes(q) &&
+              (currentFilter === 'all' || (f.practiceAreas || []).includes(currentFilter));
+            if (matches) results.push({ ...f, city: cityName, state: stateName });
+          });
+        });
+      });
 
-            const tooltip = document.getElementById('cityTooltip');
-            const currentTransform = d3.zoomTransform(svg.node());
-            const scale = currentTransform.k;
-
-            Object.keys(firmsData).forEach(stateName => {
-                Object.entries(firmsData[stateName].cities).forEach(([cityName, firms]) => {
-                    if (firms.length === 0) return;
-
-                    const filteredFirms = currentFilter === 'all' 
-                        ? firms 
-                        : firms.filter(f => f.practiceAreas.includes(currentFilter));
-
-                    if (filteredFirms.length === 0) return;
-
-                    const coords = projection([firms[0].longitude, firms[0].latitude]);
-                    if (!coords) return;
-
-                    // Make circles smaller when zoomed in
-                    const baseRadius = 5;
-                    const adjustedRadius = baseRadius / Math.sqrt(scale);
-
-                    svg.append("circle")
-                        .attr("class", "city-circle")
-                        .attr("cx", coords[0])
-                        .attr("cy", coords[1])
-                        .attr("r", adjustedRadius)
-                        .on("click", (event) => {
-                            event.stopPropagation();
-                            showCityFirms(stateName, cityName);
-                        })
-                        .on("mouseover", function(event) {
-                            const firmCount = filteredFirms.length;
-                            tooltip.textContent = `${cityName} (${firmCount} firm${firmCount !== 1 ? 's' : ''})`;
-                            tooltip.style.display = 'block';
-                            d3.select(this).attr("r", adjustedRadius * 1.3);
-                        })
-                        .on("mousemove", function(event) {
-                            tooltip.style.left = (event.pageX + 15) + 'px';
-                            tooltip.style.top = (event.pageY - 10) + 'px';
-                        })
-                        .on("mouseout", function() {
-                            tooltip.style.display = 'none';
-                            d3.select(this).attr("r", adjustedRadius);
-                        });
-                });
-            });
-        }
-
-        function zoomToState(stateFeature, stateName) {
-            currentState = stateName;
-
-            document.querySelector('.back-button').style.display = 'block';
-            document.querySelector('#stateTitle').style.display = 'block';
-            document.querySelector('#stateTitle').textContent = stateName;
-
-            const bounds = path.bounds(stateFeature);
-            const dx = bounds[1][0] - bounds[0][0];
-            const dy = bounds[1][1] - bounds[0][1];
-            const x = (bounds[0][0] + bounds[1][0]) / 2;
-            const y = (bounds[0][1] + bounds[1][1]) / 2;
-            const scale = Math.min(8, 0.9 / Math.max(dx / 960, dy / 600));
-            const translate = [960 / 2 - scale * x, 600 / 2 - scale * y];
-
-            svg.transition()
-                .duration(750)
-                .call(zoom.transform, d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale));
-
-            showStateFirms(stateName);
-        }
-
-        function resetToUSView() {
-            currentState = null;
-            document.querySelector('.back-button').style.display = 'none';
-            document.querySelector('#stateTitle').style.display = 'none';
-
-            svg.transition()
-                .duration(750)
-                .call(zoom.transform, d3.zoomIdentity);
-
-            showStatesList();
-        }
-
-        function showStatesList() {
-            const stateCounts = {};
-            Object.keys(firmsData).forEach(state => {
-                stateCounts[state] = getUniqueFirmCount(state);
-            });
-
-            const sortedStates = Object.entries(stateCounts)
-                .sort((a, b) => b[1] - a[1]);
-
-            let html = '<h3>Spotlight Ranked Firms by State</h3>';
-            html += '<p style="margin-bottom: 15px;">Click on any state to explore firms and filter by practice area.</p>';
-            html += '<div style="background: white; border-radius: 6px; padding: 10px;">';
-            html += '<ul style="margin: 0; padding-left: 20px;">';
-            sortedStates.forEach(([state, count]) => {
-                html += `<li style="margin: 8px 0;"><strong>${state}:</strong> ${count} firms</li>`;
-            });
-            html += '</ul></div>';
-
-            document.getElementById('firmsTable').innerHTML = html;
-        }
-
-        function showStateFirms(stateName) {
-            const firms = [];
-            Object.entries(firmsData[stateName].cities).forEach(([city, cityFirms]) => {
-                cityFirms.forEach(firm => {
-                    const matchesFilter = currentFilter === 'all' || firm.practiceAreas.includes(currentFilter);
-                    if (matchesFilter) {
-                        firms.push({ ...firm, city });
-                    }
-                });
-            });
-
-            firms.sort((a, b) => a.name.localeCompare(b.name));
-
-            let html = `<h3>Firms in ${stateName}</h3>`;
-            html += `<p style="margin-bottom: 15px;"><strong>${firms.length}</strong> firm${firms.length !== 1 ? 's' : ''} found</p>`;
-
-            firms.forEach(firm => {
-                html += `
-                    <div class="firm-item">
-                        <div class="firm-name">${firm.name}</div>
-                        <div class="firm-city">${firm.city}</div>
-                        <div class="firm-practice-areas">${firm.practiceAreas.join(', ')}</div>
-                    </div>
-                `;
-            });
-
-            document.getElementById('firmsTable').innerHTML = html;
-        }
-
-        function showCityFirms(stateName, cityName) {
-            const firms = firmsData[stateName].cities[cityName]
-                .filter(f => currentFilter === 'all' || f.practiceAreas.includes(currentFilter))
-                .sort((a, b) => a.name.localeCompare(b.name));
-
-            let html = `<h3>Firms in ${cityName}, ${stateName}</h3>`;
-            html += `<p style="margin-bottom: 15px;"><strong>${firms.length}</strong> firm${firms.length !== 1 ? 's' : ''}</p>`;
-
-            firms.forEach(firm => {
-                html += `
-                    <div class="firm-item">
-                        <div class="firm-name">${firm.name}</div>
-                        <div class="firm-practice-areas">${firm.practiceAreas.join(', ')}</div>
-                    </div>
-                `;
-            });
-
-            document.getElementById('firmsTable').innerHTML = html;
-        }
-
-        function filterByPracticeArea() {
-            currentFilter = document.getElementById('practiceArea').value;
-            addCityCircles();
-
-            if (currentState) {
-                showStateFirms(currentState);
-            }
-        }
-
-        function getStateName(stateId) {
-            const stateNames = {
-                "01": "Alabama", "02": "Alaska", "04": "Arizona", "05": "Arkansas", "06": "California",
-                "08": "Colorado", "09": "Connecticut", "10": "Delaware", "11": "District of Columbia",
-                "12": "Florida", "13": "Georgia", "15": "Hawaii", "16": "Idaho", "17": "Illinois",
-                "18": "Indiana", "19": "Iowa", "20": "Kansas", "21": "Kentucky", "22": "Louisiana",
-                "23": "Maine", "24": "Maryland", "25": "Massachusetts", "26": "Michigan", "27": "Minnesota",
-                "28": "Mississippi", "29": "Missouri", "30": "Montana", "31": "Nebraska", "32": "Nevada",
-                "33": "New Hampshire", "34": "New Jersey", "35": "New Mexico", "36": "New York",
-                "37": "North Carolina", "38": "North Dakota", "39": "Ohio", "40": "Oklahoma",
-                "41": "Oregon", "42": "Pennsylvania", "44": "Rhode Island", "45": "South Carolina",
-                "46": "South Dakota", "47": "Tennessee", "48": "Texas", "49": "Utah", "50": "Vermont",
-                "51": "Virginia", "53": "Washington", "54": "West Virginia", "55": "Wisconsin", "56": "Wyoming"
-            };
-            return stateNames[String(stateId).padStart(2, '0')];
-        }
-    </script>
+      let html = `<h3>Search results${currentState ? ' in ' + currentState : ''}</h3>`;
+      html += `<p style="margin-bottom: 15px;"><strong>${results.length}</strong> match${results.length !== 1 ? 'es' : ''}</p>`;
+      results.sort((a,b)=>a.name.localeCompare(b.name)).forEach(row => {
+        html += `
+          <div class="firm-item">
+            <div class="firm-name">${row.name}</div>
+            <div class="firm-city">${row.city}${row.state ? ', ' + row.state : ''}</div>
+            <div class="firm-practice-areas">${(row.practiceAreas || []).join(', ')}</div>
+          </div>`;
+      });
+      document.getElementById('firmsTable').innerHTML = html;
+    }
+  </script>
 </body>
 </html>
