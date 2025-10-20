@@ -166,13 +166,14 @@
         .city-circle {
             fill: #ff6b35;
             stroke: #fff;
-            stroke-width: 2px;
+            stroke-width: 1.5px;
             cursor: pointer;
             transition: all 0.3s ease;
         }
         
         .city-circle:hover {
             fill: #ff8c42;
+            stroke-width: 2.5px;
         }
 
         .city-tooltip {
@@ -284,24 +285,24 @@
             <svg id="map"></svg>
             <div class="legend">
                 <div class="legend-item">
-                    <div class="legend-color" style="background: #1e3a8a;"></div>
+                    <div class="legend-color" style="background: #002b49;"></div>
                     <span>High (200+ firms)</span>
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background: #3b82f6;"></div>
+                    <div class="legend-color" style="background: #4a7a9e;"></div>
                     <span>Medium (100-199 firms)</span>
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background: #93c5fd;"></div>
+                    <div class="legend-color" style="background: #8ba8c4;"></div>
                     <span>Low (50-99 firms)</span>
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background: #bfdbfe;"></div>
+                    <div class="legend-color" style="background: #CBE1F8;"></div>
                     <span>Few (1-49 firms)</span>
                 </div>
                 <div class="legend-item">
                     <div class="legend-color" style="background: #ff6b35;"></div>
-                    <span>Firm Location</span>
+                    <span>Cities</span>
                 </div>
             </div>
         </div>
@@ -319,6 +320,10 @@
             </div>
             
             <div class="controls">
+                <div class="control-group">
+                    <label for="firmSearch">Search for Firm:</label>
+                    <input type="text" id="firmSearch" placeholder="Type firm name..." oninput="searchFirms()">
+                </div>
                 <div class="control-group">
                     <label for="practiceArea">Filter by Practice Area:</label>
                     <select id="practiceArea" onchange="filterByPracticeArea()">
@@ -449,6 +454,8 @@
                 .on("zoom", (event) => {
                     svg.selectAll("path").attr("transform", event.transform);
                     svg.selectAll("circle").attr("transform", event.transform);
+                    // Redraw circles with adjusted size when zooming
+                    addCityCircles();
                 });
 
             svg.call(zoom);
@@ -479,6 +486,8 @@
             svg.selectAll(".city-circle").remove();
 
             const tooltip = document.getElementById('cityTooltip');
+            const currentTransform = d3.zoomTransform(svg.node());
+            const scale = currentTransform.k;
 
             Object.keys(firmsData).forEach(stateName => {
                 Object.entries(firmsData[stateName].cities).forEach(([cityName, firms]) => {
@@ -493,16 +502,24 @@
                     const coords = projection([firms[0].longitude, firms[0].latitude]);
                     if (!coords) return;
 
+                    // Make circles smaller when zoomed in
+                    const baseRadius = 5;
+                    const adjustedRadius = baseRadius / Math.sqrt(scale);
+
                     svg.append("circle")
                         .attr("class", "city-circle")
                         .attr("cx", coords[0])
                         .attr("cy", coords[1])
-                        .attr("r", 6)
-                        .on("click", () => showCityFirms(stateName, cityName))
+                        .attr("r", adjustedRadius)
+                        .on("click", (event) => {
+                            event.stopPropagation();
+                            showCityFirms(stateName, cityName);
+                        })
                         .on("mouseover", function(event) {
                             const firmCount = filteredFirms.length;
                             tooltip.textContent = `${cityName} (${firmCount} firm${firmCount !== 1 ? 's' : ''})`;
                             tooltip.style.display = 'block';
+                            d3.select(this).attr("r", adjustedRadius * 1.3);
                         })
                         .on("mousemove", function(event) {
                             tooltip.style.left = (event.pageX + 15) + 'px';
@@ -510,6 +527,7 @@
                         })
                         .on("mouseout", function() {
                             tooltip.style.display = 'none';
+                            d3.select(this).attr("r", adjustedRadius);
                         });
                 });
             });
