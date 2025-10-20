@@ -276,6 +276,7 @@
 </head>
 <body>
     <div class="loading" id="loading">Loading firm data...</div>
+    <div class="city-tooltip" id="cityTooltip"></div>
     <div class="container" style="display: none;" id="mainContainer">
         <div class="map-container">
             <button class="back-button" onclick="resetToUSView()">← Back to US Map</button>
@@ -283,24 +284,24 @@
             <svg id="map"></svg>
             <div class="legend">
                 <div class="legend-item">
-                    <div class="legend-color" style="background: #1e3a8a;"></div>
+                    <div class="legend-color" style="background: #002b49;"></div>
                     <span>High (200+ firms)</span>
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background: #3b82f6;"></div>
+                    <div class="legend-color" style="background: #4a7a9e;"></div>
                     <span>Medium (100-199 firms)</span>
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background: #93c5fd;"></div>
+                    <div class="legend-color" style="background: #8ba8c4;"></div>
                     <span>Low (50-99 firms)</span>
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background: #bfdbfe;"></div>
+                    <div class="legend-color" style="background: #CBE1F8;"></div>
                     <span>Few (1-49 firms)</span>
                 </div>
                 <div class="legend-item">
                     <div class="legend-color" style="background: #ff6b35;"></div>
-                    <span>Firm Location</span>
+                    <span>Cities</span>
                 </div>
             </div>
         </div>
@@ -342,8 +343,13 @@
         let svg, projection, path, zoom;
 
         // Load and process CSV data from GitHub
-        d3.csv('https://raw.githubusercontent.com/JonoBaskett/spotlight-map-data/refs/heads/main/spotlight-firms-data.csv')
-            .then(data => {
+        fetch('https://raw.githubusercontent.com/JonoBaskett/spotlight-map-data/refs/heads/main/spotlight-firms-data.csv')
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to load CSV');
+                return response.text();
+            })
+            .then(csvText => {
+                const data = d3.csvParse(csvText);
                 processData(data);
                 initializeMap();
                 document.getElementById('loading').style.display = 'none';
@@ -351,7 +357,7 @@
             })
             .catch(error => {
                 console.error('Error loading data:', error);
-                document.getElementById('loading').textContent = 'Error loading firm data. Please refresh the page.';
+                document.getElementById('loading').textContent = 'Error loading firm data. Please check your internet connection and refresh the page.';
             });
 
         function processData(data) {
@@ -412,10 +418,19 @@
         function getStateColor(stateName) {
             const count = getUniqueFirmCount(stateName);
             if (count === 0) return '#e8e8e8';
-            if (count >= 200) return '#1e3a8a';
-            if (count >= 100) return '#3b82f6';
-            if (count >= 50) return '#93c5fd';
-            return '#bfdbfe';
+            
+            // Calculate color between dark blue (#002b49) and light blue (#CBE1F8)
+            const maxCount = 262; // NY has the most firms
+            const minCount = 1;
+            const ratio = (count - minCount) / (maxCount - minCount);
+            
+            // Dark blue RGB: 0, 43, 73
+            // Light blue RGB: 203, 225, 248
+            const r = Math.round(203 - (203 * ratio));
+            const g = Math.round(225 - (182 * ratio));
+            const b = Math.round(248 - (175 * ratio));
+            
+            return `rgb(${r}, ${g}, ${b})`;
         }
 
         function initializeMap() {
@@ -463,6 +478,8 @@
         function addCityCircles() {
             svg.selectAll(".city-circle").remove();
 
+            const tooltip = document.getElementById('cityTooltip');
+
             Object.keys(firmsData).forEach(stateName => {
                 Object.entries(firmsData[stateName].cities).forEach(([cityName, firms]) => {
                     if (firms.length === 0) return;
@@ -480,8 +497,20 @@
                         .attr("class", "city-circle")
                         .attr("cx", coords[0])
                         .attr("cy", coords[1])
-                        .attr("r", Math.min(6, 3 + Math.sqrt(filteredFirms.length)))
-                        .on("click", () => showCityFirms(stateName, cityName));
+                        .attr("r", 6)
+                        .on("click", () => showCityFirms(stateName, cityName))
+                        .on("mouseover", function(event) {
+                            const firmCount = filteredFirms.length;
+                            tooltip.textContent = `${cityName} (${firmCount} firm${firmCount !== 1 ? 's' : ''})`;
+                            tooltip.style.display = 'block';
+                        })
+                        .on("mousemove", function(event) {
+                            tooltip.style.left = (event.pageX + 15) + 'px';
+                            tooltip.style.top = (event.pageY - 10) + 'px';
+                        })
+                        .on("mouseout", function() {
+                            tooltip.style.display = 'none';
+                        });
                 });
             });
         }
